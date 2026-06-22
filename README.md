@@ -31,6 +31,10 @@ outbound call
 - Detects representative pickup from `call.unhold` or transcript phrases.
 - Stops hold transcription and starts a representative interaction assistant with call context.
 
+## How It Works
+
+For a deeper walkthrough of the agent architecture, call flow, state machine, endpoints, context handoff, and production hardening notes, see [`docs/how-it-works.md`](docs/how-it-works.md).
+
 ## Quick Answer
 
 Can I run a Telnyx outbound hold agent locally?
