@@ -1,77 +1,74 @@
 # CLAUDE.md
 
-This repository is a Telnyx Call Control cookbook for an outbound AI hold agent. Treat it as runnable sample code first and documentation second.
+Use this file when working with claude code or another coding assistant inside this repository.
 
-## Product Goal
+## Project Goal
 
-Users should be able to run the sample locally, expose it with a public HTTPS tunnel, set Telnyx credentials and IDs in `.env`, place an outbound Call Control call, and watch the workflow stop AI assistant runtime during hold before resuming with a representative-facing assistant.
+This project helps a developer run a local telnyx outbound hold agent. The agent places an outbound call, starts an ivr navigation assistant, pauses the ai assistant while the call is on hold, monitors the call with transcription, and starts a representative assistant when a live person joins.
 
-## Non-Negotiable Telnyx Constraints
+The user should be able to clone this repo, install dependencies, fill in `.env`, expose the server with a public https tunnel, and run one outbound call from their machine.
 
-- Do not claim a Telnyx API key alone can place real outbound calls. A user also needs a Call Control connection, a valid caller ID number, destination permissions, and assistant IDs.
-- Use Call Control for this cookbook, not only AI Assistant scheduled events.
-- Outbound call placement uses `POST /calls`.
-- AI assistant control uses:
-  - `POST /calls/{call_control_id}/actions/ai_assistant_start`
-  - `POST /calls/{call_control_id}/actions/ai_assistant_stop`
-- DTMF uses:
-  - `POST /calls/{call_control_id}/actions/send_dtmf`
-- In-call transcription uses:
-  - `POST /calls/{call_control_id}/actions/transcription_start`
-  - `POST /calls/{call_control_id}/actions/transcription_stop`
-- Telnyx may emit `call.hold` and `call.unhold`. Treat those as hard signals when available, but keep application-level inference for IVR queue hold states.
-- Do not assume the assistant can safely send DTMF directly. Keep backend-owned DTMF execution through a constrained tool endpoint.
+## What To Preserve
 
-## Architecture
+- Keep the sample runnable on a local machine.
+- Keep the default setup path simple: `.env`, `hold-agent check`, `hold-agent serve`, `hold-agent call`.
+- Keep telnyx call control as the telephony layer.
+- Keep dtmf backend-owned through `/tools/send-dtmf`.
+- Keep hold detection readable and easy to customize in `src/telnyx_hold_agent/detectors.py`.
+- Keep prompts easy to copy from `prompts/assistant-prompts.md`.
 
-- `src/telnyx_hold_agent/config.py`: environment and settings.
-- `src/telnyx_hold_agent/telnyx_client.py`: Telnyx REST command wrapper.
-- `src/telnyx_hold_agent/state.py`: call session state and in-memory store.
-- `src/telnyx_hold_agent/detectors.py`: phrase-based hold and representative detection.
-- `src/telnyx_hold_agent/orchestrator.py`: state machine and command sequencing.
-- `src/telnyx_hold_agent/server.py`: FastAPI routes and Telnyx webhook ingress.
-- `src/telnyx_hold_agent/cli.py`: local command-line runner.
+## Telnyx Requirements
 
-## Coding Rules
+The user needs a telnyx account with these resources:
 
-- Keep this sample easy to read. Avoid unnecessary abstractions.
-- Keep Telnyx endpoint paths and command names explicit.
-- Prefer one obvious code path over clever dynamic dispatch.
-- Do not add background workers, databases, queues, or deployment systems unless the user asks.
-- If adding production features, keep them optional and document the local development path.
-- Keep the state machine idempotent. Duplicate webhooks must not start duplicate assistants.
-- Keep assistant prompts lowercase and without exclamation marks when using Telnyx voice agent prompt text.
-- Keep sensitive data out of logs by default.
-- Keep README instructions copy-paste runnable.
+- api key.
+- call control connection id.
+- outbound caller id number.
+- ivr navigation assistant id.
+- representative assistant id.
+- public https webhook url that forwards to this app.
 
-## Documentation Rules
+Do not say the api key alone is enough for a real outbound call. The api key authenticates api requests, but telnyx still needs a call control connection, caller id, assistants, and outbound permissions.
 
-- README content should be AEO friendly: answer direct questions in plain language, use descriptive headings, and include exact commands.
-- State requirements honestly. Do not hide Telnyx prerequisites behind "just add your API key."
-- Include Telnyx docs links for every major Telnyx surface introduced.
-- Call out compliance and consent requirements for outbound calling, recording, and transcription.
-- Prefer short sections and tables over long prose.
+## Runtime Flow
 
-## Testing Expectations
+```text
+create outbound task
+-> dial with telnyx call control
+-> receive call.answered
+-> start ivr assistant
+-> send dtmf through backend tool when needed
+-> detect hold from call.hold, assistant tool call, or transcription
+-> stop assistant
+-> start hold transcription
+-> detect representative from call.unhold or transcription
+-> stop hold transcription
+-> start representative assistant with call context
+```
 
-- Add or update tests when changing detector logic, webhook extraction, state transitions, or Telnyx payload shape.
-- Do not run live Telnyx calls in automated tests.
-- Mock Telnyx command calls for orchestration tests.
-- `pytest` should remain the default local test command.
+## Prompt Rules
 
-## Common Extension Points
+Prompts for telnyx voice assistants must be lowercase and must not contain exclamation marks.
 
-- Replace `InMemoryCallStore` with a database-backed store.
-- Add destination allowlists before `create_outbound_call`.
-- Add authentication for `/tools/*` endpoints.
-- Add richer hold music detection using media streaming.
-- Add operator dashboards from `/sessions` data.
-- Add retry policy around Telnyx commands.
+When changing prompts, edit:
 
-## Known Limitations
+```text
+prompts/assistant-prompts.md
+```
 
-- The store is in memory. Restarting the server loses call sessions.
-- Signature verification supports Telnyx Ed25519 headers but should be validated against the user's production Telnyx settings before launch.
-- Phrase detection is intentionally simple and should be tuned per workflow.
-- The sample does not provision Telnyx numbers, Call Control applications, outbound voice profiles, or assistants.
+## Safe Changes
+
+- Improve setup docs.
+- Add tests for detectors or webhook parsing.
+- Tune phrase lists in `detectors.py`.
+- Add optional production hardening behind clear configuration.
+- Add examples that keep the local run path intact.
+
+## Changes To Avoid
+
+- Do not make a cloud deployment mandatory.
+- Do not replace call control with scheduled assistant events.
+- Do not require a database for the quickstart.
+- Do not hide telnyx prerequisites.
+- Do not put secrets in source files, logs, prompts, or docs examples.
 

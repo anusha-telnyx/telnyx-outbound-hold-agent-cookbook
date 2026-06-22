@@ -2,7 +2,22 @@
 
 Build an outbound Telnyx AI voice agent that can call a phone number, navigate IVRs, stop the AI assistant while the call is on hold, monitor the hold with transcription, and restart a representative-facing assistant when a human answers.
 
-This cookbook is a runnable Python/FastAPI starter based on the PRD in `../prd-template.md`.
+This repo is a runnable Python/FastAPI starter for building a hold-aware outbound calling agent on your own machine.
+
+## What You Are Building
+
+The agent keeps the phone call connected while reducing AI assistant runtime during long queue or hold periods.
+
+```txt
+outbound call
+-> ivr navigation assistant
+-> backend-owned dtmf
+-> hold detected
+-> stop ai assistant
+-> transcription-only hold monitoring
+-> representative detected
+-> representative assistant resumes with context
+```
 
 ## What This Sample Does
 
@@ -20,7 +35,7 @@ This cookbook is a runnable Python/FastAPI starter based on the PRD in `../prd-t
 
 Can I run a Telnyx outbound hold agent locally?
 
-Yes. Start this FastAPI server, expose it with a public tunnel such as ngrok, configure Telnyx Call Control to use that webhook URL, set your Telnyx API key and call settings in `.env`, then run `hold-agent call --to +15551234567`.
+Yes. Clone this repo, install the Python dependencies, expose the local FastAPI server with a public HTTPS tunnel such as ngrok, add your Telnyx values to `.env`, then run `hold-agent call --to +15551234567`.
 
 ## Requirements
 
@@ -31,12 +46,13 @@ You need:
 - A Telnyx API key.
 - A Telnyx Call Control application or connection ID.
 - A Telnyx phone number that can be used as outbound caller ID.
+- Outbound voice permissions for the destination country.
 - Two Telnyx AI Assistant IDs:
   - one assistant for IVR navigation.
   - one assistant for live representative interaction.
 - A public HTTPS URL that forwards to this local server.
 
-An API key alone is not enough to place a real outbound call. Telnyx also needs a caller ID number, a Call Control connection, and outbound permissions for the destination country.
+An API key authenticates requests to Telnyx, but it is not enough by itself to place a real outbound call. Telnyx also needs a caller ID number, a Call Control connection, assistant IDs, and outbound permissions for the destination country.
 
 ## Install
 
@@ -102,20 +118,31 @@ https://YOUR-NGROK-DOMAIN/webhooks/telnyx
 
 ## Environment Variables
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `TELNYX_API_KEY` | Yes | Authenticates Telnyx REST API requests. |
-| `TELNYX_CONNECTION_ID` | Yes | Call Control connection used by the Dial command. |
-| `TELNYX_FROM_NUMBER` | Yes | Telnyx caller ID number in E.164 format. |
-| `TELNYX_IVR_ASSISTANT_ID` | Yes | Assistant started after `call.answered`. |
-| `TELNYX_REPRESENTATIVE_ASSISTANT_ID` | Yes | Assistant started after representative pickup. |
-| `PUBLIC_BASE_URL` | Yes | Public HTTPS base URL for Telnyx webhooks. |
-| `TELNYX_PUBLIC_KEY` | Recommended | Enables Ed25519 webhook signature verification. |
-| `START_TRANSCRIPTION_DURING_IVR` | No | Starts transcription during IVR navigation for softer hold detection. Defaults to `false`. |
-| `TRANSCRIPTION_ENGINE` | No | STT engine for `transcription_start`. Defaults to `Deepgram`. |
-| `TRANSCRIPTION_MODEL` | No | STT model for engines that require a model. Defaults to `deepgram/nova-3`. |
-| `TRANSCRIPTION_LANGUAGE` | No | STT language. Defaults to `en`. |
-| `TRANSCRIPTION_TRACKS` | No | Telnyx transcription track setting. Defaults to `both`. |
+The default local run path needs only these values:
+
+| Variable | Purpose |
+| --- | --- |
+| `TELNYX_API_KEY` | Authenticates Telnyx REST API requests. |
+| `TELNYX_CONNECTION_ID` | Call Control connection used by the Dial command. |
+| `TELNYX_FROM_NUMBER` | Telnyx caller ID number in E.164 format. |
+| `TELNYX_IVR_ASSISTANT_ID` | Assistant started after `call.answered`. |
+| `TELNYX_REPRESENTATIVE_ASSISTANT_ID` | Assistant started after representative pickup. |
+| `PUBLIC_BASE_URL` | Public HTTPS base URL for Telnyx webhooks. |
+
+## Assistant Setup
+
+Create two Telnyx AI Assistants:
+
+- IVR navigation assistant: use the IVR prompt in `prompts/assistant-prompts.md`.
+- Representative assistant: use the representative prompt in `prompts/assistant-prompts.md`.
+
+Add the IVR assistant ID to `TELNYX_IVR_ASSISTANT_ID`.
+
+Add the representative assistant ID to `TELNYX_REPRESENTATIVE_ASSISTANT_ID`.
+
+If you want the IVR assistant to press phone menu options, configure an assistant tool that calls this app's `/tools/send-dtmf` endpoint.
+
+If you want the IVR assistant to explicitly signal hold, configure an assistant tool that calls this app's `/tools/hold-detected` endpoint.
 
 ## State Machine
 
@@ -178,27 +205,15 @@ Body:
 }
 ```
 
-## Suggested Assistant Instructions
+## Assistant Prompts
 
-### IVR Navigation Assistant
-
-```txt
-you are an ivr navigation assistant for outbound operational calls.
-
-your job is to reach the correct department for the task. listen to automated prompts, choose the most appropriate menu option, and request dtmf through the approved tool when a menu digit is needed.
-
-if the call enters a queue or hold period, do not continue speaking. call the hold-detected tool and wait for the system to resume the next stage.
-```
-
-### Representative Assistant
+Copy the assistant prompts from:
 
 ```txt
-you are now speaking with a live representative.
-
-use the provided call context and do not repeat ivr navigation details unless asked. stay silent through greetings or hold-return scripts unless the representative asks a question or requests the reason for the call.
-
-complete the assigned business task accurately, disclose only approved information, and end the call professionally when the task is complete.
+prompts/assistant-prompts.md
 ```
+
+Use the IVR navigation prompt for `TELNYX_IVR_ASSISTANT_ID` and the representative prompt for `TELNYX_REPRESENTATIVE_ASSISTANT_ID`.
 
 ## Customizing Hold Detection
 
@@ -249,7 +264,7 @@ The assistant should not directly send DTMF. Configure a tool that calls `/tools
 
 ### The representative assistant starts too early
 
-Tune `HOLD_CONFIDENCE_THRESHOLD`, `REPRESENTATIVE_CONFIDENCE_THRESHOLD`, and the phrase lists in `detectors.py`.
+Tune the phrase lists and thresholds in `src/telnyx_hold_agent/detectors.py`.
 
 ## Production Notes
 
