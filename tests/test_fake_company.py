@@ -46,3 +46,11 @@ def test_fake_company_dtmf_endpoint_returns_wav() -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("audio/wav")
     assert response.content.startswith(b"RIFF")
+
+
+def test_media_dtmf_endpoint_returns_wav() -> None:
+    response = TestClient(app).get("/media/dtmf/1.wav")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("audio/wav")
+    assert response.content.startswith(b"RIFF")

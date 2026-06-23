@@ -57,3 +57,11 @@ def test_representative_assistant_starts_before_hold_transcription_cleanup() -> 
     assert session.state == CallState.LIVE_CONVERSATION
     assert session.active_assistant == "representative"
     assert session.transcription_active is False
+
+
+def test_dtmf_feedback_url_uses_public_media_route() -> None:
+    settings = Settings(PUBLIC_BASE_URL="https://example.test")
+    orchestrator = CallOrchestrator(settings, InMemoryCallStore(), DummyTelnyxClient())  # type: ignore[arg-type]
+
+    assert orchestrator._dtmf_feedback_url("1") == "https://example.test/media/dtmf/1.wav"
+    assert orchestrator._dtmf_feedback_url("#") == "https://example.test/media/dtmf/%23.wav"

@@ -1,5 +1,7 @@
+import asyncio
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote
 from uuid import uuid4
 
 from .config import Settings
@@ -84,11 +86,29 @@ class CallOrchestrator:
         session = self.store.get_by_call_control_id(call_control_id)
         if not session:
             raise ValueError("unknown call_control_id")
-        response = await self.telnyx.send_dtmf(
-            call_control_id=call_control_id,
-            digits=digits,
-            context={"session_id": session.session_id, "reason": reason, "stage": session.state.value},
-        )
+        context = {"session_id": session.session_id, "reason": reason, "stage": session.state.value}
+        send_task = self.telnyx.send_dtmf(call_control_id=call_control_id, digits=digits, context=context)
+        feedback_url = self._dtmf_feedback_url(digits)
+        if feedback_url:
+            send_response, playback_response = await asyncio.gather(
+                send_task,
+                self.telnyx.play_audio(
+                    call_control_id=call_control_id,
+                    audio_url=feedback_url,
+                    context={**context, "feedback": "dtmf_tone"},
+                    target_legs="both",
+                ),
+                return_exceptions=True,
+            )
+            if isinstance(playback_response, Exception):
+                session.events.append(
+                    {"at": datetime.now(UTC).isoformat(), "dtmf_feedback_error": str(playback_response)}
+                )
+            if isinstance(send_response, Exception):
+                raise send_response
+            response = send_response
+        else:
+            response = await send_task
         session.events.append({"at": datetime.now(UTC).isoformat(), "dtmf_sent": digits, "reason": reason})
         return response
 
@@ -177,6 +197,14 @@ class CallOrchestrator:
 
     def _representative_greeting(self, session: CallSession) -> str:
         return f"hi, i am calling to {session.objective}."
+
+    def _dtmf_feedback_url(self, digits: str) -> str:
+        if not self.settings.public_base_url or not digits:
+            return ""
+        digit = digits[0]
+        if digit not in "0123456789*#":
+            return ""
+        return f"{self.settings.public_base_url.rstrip('/')}/media/dtmf/{quote(digit, safe='')}.wav"
 
     def _assistant_context(self, session: CallSession) -> dict[str, Any]:
         hold_seconds = None

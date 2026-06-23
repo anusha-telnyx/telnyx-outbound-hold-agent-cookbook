@@ -85,6 +85,15 @@ async def fake_company_menu(request: Request) -> Response:
 
 @app.get("/fake-company/dtmf/{digit}.wav")
 async def fake_company_dtmf(digit: str) -> Response:
+    return _dtmf_response(digit)
+
+
+@app.get("/media/dtmf/{digit}.wav")
+async def media_dtmf(digit: str) -> Response:
+    return _dtmf_response(digit)
+
+
+def _dtmf_response(digit: str) -> Response:
     if digit not in DTMF_FREQUENCIES:
         raise HTTPException(status_code=404, detail="unknown dtmf digit")
     return Response(content=_dtmf_wav(digit), media_type="audio/wav")

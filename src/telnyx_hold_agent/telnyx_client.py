@@ -67,6 +67,25 @@ class TelnyxClient:
         }
         return await self._post(f"/calls/{call_control_id}/actions/send_dtmf", payload)
 
+    async def play_audio(
+        self,
+        *,
+        call_control_id: str,
+        audio_url: str,
+        context: dict[str, Any],
+        target_legs: str = "both",
+    ) -> dict[str, Any]:
+        payload = {
+            "audio_url": audio_url,
+            "audio_type": "wav",
+            "target_legs": target_legs,
+            "loop": 1,
+            "cache_audio": True,
+            "client_state": _encode_client_state(context),
+            "command_id": str(uuid4()),
+        }
+        return await self._post(f"/calls/{call_control_id}/actions/playback_start", payload)
+
     async def start_transcription(self, *, call_control_id: str, context: dict[str, Any]) -> dict[str, Any]:
         config: dict[str, Any] = {
             "transcription_engine": self.settings.transcription_engine,
