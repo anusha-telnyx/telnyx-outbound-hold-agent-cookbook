@@ -58,6 +58,61 @@ You need:
 
 An API key authenticates requests to Telnyx, but it is not enough by itself to place a real outbound call. Telnyx also needs a caller ID number, a Call Control connection, assistant IDs, and outbound permissions for the destination country.
 
+## Start Here: Get Your Telnyx Values
+
+Use these steps to collect the values for `.env` before running the cookbook.
+
+1. Get `TELNYX_API_KEY`
+   - Open the [Telnyx Mission Control Portal](https://portal.telnyx.com/).
+   - Go to **API Keys**.
+   - Create or copy an API key.
+   - Paste it into `.env` as `TELNYX_API_KEY`.
+
+2. Create or find `TELNYX_CONNECTION_ID`
+   - In the portal, go to **Voice** -> **Programmable Voice** -> **Voice API Applications**.
+   - Create a Voice API / Call Control application, or open an existing one.
+   - Set the webhook URL to `https://YOUR_PUBLIC_BASE_URL/webhooks/telnyx`.
+   - Copy the application's connection ID.
+   - Paste it into `.env` as `TELNYX_CONNECTION_ID`.
+
+3. Choose `TELNYX_FROM_NUMBER`
+   - In the portal, go to **Numbers** -> **My Numbers**.
+   - Buy or choose a voice-capable Telnyx number.
+   - Assign it to the Voice API application from step 2.
+   - Copy the number in E.164 format, for example `+15551234567`.
+   - Paste it into `.env` as `TELNYX_FROM_NUMBER`.
+
+4. Allow outbound calling
+   - In the portal, go to **Voice** -> **Settings** -> **Outbound Voice Profiles**.
+   - Open the outbound voice profile associated with your Voice API application.
+   - Confirm the destination country you want to call is allowed.
+   - For local testing in the US, make sure United States calling is enabled.
+
+5. Create `TELNYX_IVR_ASSISTANT_ID`
+   - In the portal, go to **AI** -> **AI Assistants**.
+   - Create an assistant for IVR navigation.
+   - Copy the IVR navigation prompt from `prompts/assistant-prompts.md`.
+   - Add tools for `/tools/send-dtmf` and `/tools/hold-detected`.
+   - Copy the assistant ID and paste it into `.env` as `TELNYX_IVR_ASSISTANT_ID`.
+
+6. Create `TELNYX_REPRESENTATIVE_ASSISTANT_ID`
+   - In **AI** -> **AI Assistants**, create a second assistant for representative interaction.
+   - Copy the representative prompt from `prompts/assistant-prompts.md`.
+   - Optionally add the `/tools/end-call` tool so the assistant can end completed calls.
+   - Copy the assistant ID and paste it into `.env` as `TELNYX_REPRESENTATIVE_ASSISTANT_ID`.
+
+7. Set `PUBLIC_BASE_URL`
+   - Start a tunnel to your local server, for example `ngrok http 8000`.
+   - Copy the public HTTPS URL, for example `https://abc123.ngrok-free.app`.
+   - Paste it into `.env` as `PUBLIC_BASE_URL`.
+   - Update the Voice API application webhook URL from step 2 if the tunnel URL changes.
+
+After these steps, run:
+
+```bash
+hold-agent check
+```
+
 ## Install
 
 ```bash
