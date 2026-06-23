@@ -159,6 +159,18 @@ hold-agent call \
 
 For a concrete agent-to-agent walkthrough, see [`examples/a2a-hotel-demo`](examples/a2a-hotel-demo). That folder is demo-only and shows how to use a third Telnyx AI Assistant as a fake hotel front desk target.
 
+## Start Here: Run The Hotel Demo First
+
+If this is your first time running the cookbook, start with the A2A hotel demo before calling a real company.
+
+The demo gives you a predictable target company, menu, hold period, representative pickup, and call ending. It is the easiest way to confirm that your Telnyx values, assistant tools, public webhook URL, DTMF flow, hold detection, and representative handoff are working.
+
+Start here:
+
+```txt
+examples/a2a-hotel-demo
+```
+
 ## Local Webhook URL
 
 Telnyx webhooks must reach your machine over HTTPS. For local development, run a tunnel:
