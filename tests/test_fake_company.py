@@ -17,7 +17,7 @@ def test_fake_company_texml_starts_with_dtmf_menu() -> None:
     assert "thanks for holding" not in response.text
 
 
-def test_fake_company_menu_enters_hold_then_waits_for_speech() -> None:
+def test_fake_company_menu_enters_hold_then_pauses_for_representative_assistant() -> None:
     response = TestClient(app).post("/fake-company/menu", data={"Digits": "1"})
 
     assert response.status_code == 200
@@ -25,8 +25,8 @@ def test_fake_company_menu_enters_hold_then_waits_for_speech() -> None:
     assert 'voice="Telnyx.Ultra.' in response.text
     assert "please hold for the next available reservations agent" in response.text
     assert "thanks for holding, this is sarah with willow creek hotel reservations" in response.text
-    assert 'input="speech"' in response.text
-    assert "/fake-company/reservation?step=guest_name" in response.text
+    assert '<Pause length="60"/>' in response.text
+    assert "/fake-company/reservation" not in response.text
 
 
 def test_fake_company_menu_timeout_fallback_does_not_play_late_click() -> None:
@@ -36,29 +36,6 @@ def test_fake_company_menu_timeout_fallback_does_not_play_late_click() -> None:
     assert "<Play>" not in response.text
     assert "connecting you to reservations" in response.text
     assert "/fake-company/menu?Digits=1" in response.text
-
-
-def test_fake_company_reservation_advances_one_step_after_speech() -> None:
-    response = TestClient(app).post(
-        "/fake-company/reservation?step=guest_name",
-        data={"SpeechResult": "i am calling to book a one night hotel reservation"},
-    )
-
-    assert response.status_code == 200
-    assert "may i have the guest name for the reservation" in response.text
-    assert "/fake-company/reservation?step=check_in" in response.text
-    assert "what date would you like to check in" not in response.text
-
-
-def test_fake_company_reservation_completes_after_confirmation() -> None:
-    response = TestClient(app).post(
-        "/fake-company/reservation?step=complete",
-        data={"SpeechResult": "yes please reserve that"},
-    )
-
-    assert response.status_code == 200
-    assert "i have reserved a standard room for alex morgan" in response.text
-    assert "<Hangup/>" in response.text
 
 
 def test_fake_company_dtmf_endpoint_returns_wav() -> None:
