@@ -46,7 +46,7 @@ In another terminal, call the fake hotel assistant number:
 
 ```bash
 hold-agent call \
-  --to +16282564467 \
+  --to +TEST-COMPANY-PHONE-NUMBER \
   --target-company "Willow Creek Hotel" \
   --objective "book a one-night hotel reservation for one guest" \
   --context-json '{"guest_name":"Alex Morgan","check_in_date":"2026-06-30","nights":1,"room_type":"standard room","budget":"under 250 dollars before taxes","special_requests":"quiet room if available"}'
