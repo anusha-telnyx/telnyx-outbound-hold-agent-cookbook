@@ -2,6 +2,7 @@ import html
 import io
 import json
 import math
+from urllib.parse import parse_qs
 import wave
 
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -35,50 +36,75 @@ async def health() -> dict[str, object]:
 @app.api_route("/fake-company/texml", methods=["GET", "POST"])
 async def fake_company_texml(request: Request) -> Response:
     dtmf_url = _public_url(request, "/fake-company/dtmf/1.wav")
-    script = [
-        "thank you for calling willow creek hotel.",
-        "for reservations, press 1. for the front desk, press 2.",
-        "reservations. one moment while i connect you.",
-        "please hold for the next available reservations agent.",
-        "your call is important to us.",
-        "thanks for holding, this is sarah with willow creek hotel reservations. how can i help you today?",
-        "i can help with that. may i have the guest name for the reservation?",
-        "thank you. what date would you like to check in?",
-        "and how many nights will you be staying?",
-        "what room type would you prefer?",
-        "i have a standard room available within that budget. would you like me to reserve that?",
-        "great. i have reserved a standard room for alex morgan for one night starting june thirtieth, twenty twenty six. the estimated rate is under two hundred fifty dollars before taxes, and i added a quiet room request. is there anything else i can help with?",
-        "thank you for calling willow creek hotel. goodbye.",
-    ]
+    action_url = _public_url(request, "/fake-company/menu")
     body = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         "<Response>",
-        f"<Say>{html.escape(script[0])}</Say>",
-        f"<Say>{html.escape(script[1])}</Say>",
-        '<Pause length="2"/>',
+        "<Say>thank you for calling willow creek hotel.</Say>",
+        f'<Gather action="{html.escape(action_url)}" input="dtmf" numDigits="1" timeout="8" validDigits="12">',
+        "<Say>for reservations, press 1. for the front desk, press 2.</Say>",
+        "</Gather>",
         f"<Play>{html.escape(dtmf_url)}</Play>",
-        f"<Say>{html.escape(script[2])}</Say>",
-        f"<Say>{html.escape(script[3])}</Say>",
-        f"<Say>{html.escape(script[4])}</Say>",
-        '<Pause length="7"/>',
-        f"<Say>{html.escape(script[5])}</Say>",
-        '<Pause length="5"/>',
-        f"<Say>{html.escape(script[6])}</Say>",
-        '<Pause length="7"/>',
-        f"<Say>{html.escape(script[7])}</Say>",
-        '<Pause length="7"/>',
-        f"<Say>{html.escape(script[8])}</Say>",
-        '<Pause length="7"/>',
-        f"<Say>{html.escape(script[9])}</Say>",
-        '<Pause length="7"/>',
-        f"<Say>{html.escape(script[10])}</Say>",
-        '<Pause length="7"/>',
-        f"<Say>{html.escape(script[11])}</Say>",
-        '<Pause length="7"/>',
-        f"<Say>{html.escape(script[12])}</Say>",
+        "<Redirect>" + html.escape(action_url) + "</Redirect>",
         "</Response>",
     ]
     return Response(content="\n".join(body), media_type="application/xml")
+
+
+@app.api_route("/fake-company/menu", methods=["GET", "POST"])
+async def fake_company_menu(request: Request) -> Response:
+    data = await _request_values(request)
+    selected = _first_value(data, "Digits", "digits", "dtmf")
+    dtmf_url = _public_url(request, "/fake-company/dtmf/1.wav")
+    if selected and selected != "1":
+        return _texml_response(
+            "<Say>for reservations, please press 1.</Say>",
+            f'<Redirect>{html.escape(_public_url(request, "/fake-company/texml"))}</Redirect>',
+        )
+
+    return _texml_response(
+        f"<Play>{html.escape(dtmf_url)}</Play>",
+        "<Say>reservations. one moment while i connect you.</Say>",
+        "<Say>please hold for the next available reservations agent.</Say>",
+        "<Say>your call is important to us.</Say>",
+        '<Pause length="7"/>',
+        _speech_gather(
+            request,
+            step="guest_name",
+            prompt="thanks for holding, this is sarah with willow creek hotel reservations. how can i help you today?",
+            timeout=12,
+        ),
+    )
+
+
+@app.api_route("/fake-company/reservation", methods=["GET", "POST"])
+async def fake_company_reservation(request: Request, step: str = "guest_name") -> Response:
+    data = await _request_values(request)
+    speech = _first_value(data, "SpeechResult", "speech_result", "transcript", "text")
+    next_step = RESERVATION_STEPS.get(step, RESERVATION_STEPS["guest_name"])
+    events = []
+    if speech:
+        events.append(f"<Say>{html.escape(next_step['ack'])}</Say>")
+
+    if next_step.get("done"):
+        events.extend(
+            [
+                "<Say>great. i have reserved a standard room for alex morgan for one night starting june thirtieth, twenty twenty six. the estimated rate is under two hundred fifty dollars before taxes, and i added a quiet room request.</Say>",
+                "<Say>thank you for calling willow creek hotel. goodbye.</Say>",
+                "<Hangup/>",
+            ]
+        )
+    else:
+        events.append(
+            _speech_gather(
+                request,
+                step=str(next_step["next"]),
+                prompt=str(next_step["prompt"]),
+                timeout=10,
+            )
+        )
+
+    return _texml_response(*events)
 
 
 @app.get("/fake-company/dtmf/{digit}.wav")
@@ -167,6 +193,88 @@ def _public_url(request: Request, path: str) -> str:
     if settings.public_base_url:
         return f"{settings.public_base_url.rstrip('/')}{path}"
     return f"{str(request.base_url).rstrip('/')}{path}"
+
+
+def _texml_response(*events: str) -> Response:
+    body = ['<?xml version="1.0" encoding="UTF-8"?>', "<Response>", *events, "</Response>"]
+    return Response(content="\n".join(body), media_type="application/xml")
+
+
+def _speech_gather(request: Request, *, step: str, prompt: str, timeout: int) -> str:
+    action = _public_url(request, f"/fake-company/reservation?step={step}")
+    return "\n".join(
+        [
+            (
+                f'<Gather action="{html.escape(action)}" input="speech" timeout="{timeout}" '
+                'speechTimeout="auto" transcriptionEngine="Deepgram" model="deepgram/nova-3" '
+                'language="en-US">'
+            ),
+            f"<Say>{html.escape(prompt)}</Say>",
+            "</Gather>",
+            f'<Redirect>{html.escape(action)}</Redirect>',
+        ]
+    )
+
+
+async def _request_values(request: Request) -> dict[str, list[str]]:
+    if request.method == "GET":
+        return dict(request.query_params.multi_items())
+
+    body = (await request.body()).decode("utf-8")
+    if not body:
+        return {}
+
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        try:
+            payload = json.loads(body)
+        except json.JSONDecodeError:
+            return {}
+        return {key: [str(value)] for key, value in payload.items()}
+    return parse_qs(body)
+
+
+def _first_value(data: dict[str, list[str]], *keys: str) -> str:
+    for key in keys:
+        value = data.get(key)
+        if isinstance(value, list) and value:
+            return value[0]
+        if isinstance(value, str):
+            return value
+    return ""
+
+
+RESERVATION_STEPS: dict[str, dict[str, object]] = {
+    "guest_name": {
+        "ack": "i can help with that.",
+        "prompt": "may i have the guest name for the reservation?",
+        "next": "check_in",
+    },
+    "check_in": {
+        "ack": "thank you.",
+        "prompt": "what date would you like to check in?",
+        "next": "nights",
+    },
+    "nights": {
+        "ack": "got it.",
+        "prompt": "and how many nights will you be staying?",
+        "next": "room_type",
+    },
+    "room_type": {
+        "ack": "thank you.",
+        "prompt": "what room type would you prefer?",
+        "next": "confirm",
+    },
+    "confirm": {
+        "ack": "i have a standard room available within that budget.",
+        "prompt": "would you like me to reserve that?",
+        "next": "complete",
+    },
+    "complete": {
+        "ack": "perfect.",
+        "done": True,
+    },
+}
 
 
 DTMF_FREQUENCIES = {

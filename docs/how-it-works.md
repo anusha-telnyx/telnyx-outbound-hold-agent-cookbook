@@ -75,7 +75,8 @@ willow creek hotel answers
 -> says "please hold for the next available reservations agent"
 -> waits briefly
 -> says "thanks for holding, this is sarah with willow creek hotel reservations"
--> asks for guest name, check-in date, number of nights, room type, and confirmation
+-> waits for the representative assistant to explain the booking request
+-> asks for guest name, check-in date, number of nights, room type, and confirmation one step at a time
 -> confirms the sample reservation details
 ```
 

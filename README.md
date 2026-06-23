@@ -107,7 +107,7 @@ For a safe end-to-end local demo, point a Telnyx number at this app's fake hotel
 https://YOUR-NGROK-DOMAIN/fake-company/texml
 ```
 
-The fake hotel answers as Willow Creek Hotel, plays a reservations menu, plays an audible DTMF tone when option 1 is selected, places the caller on hold, then returns as a reservations representative who walks through a standard hotel booking flow.
+The fake hotel answers as Willow Creek Hotel, plays a reservations menu, plays an audible DTMF tone when option 1 is selected, places the caller on hold, then returns as a reservations representative. The representative side uses speech gathers between questions, so it waits for the assistant's response before moving to the next booking step.
 
 ## Local Webhook URL
 
