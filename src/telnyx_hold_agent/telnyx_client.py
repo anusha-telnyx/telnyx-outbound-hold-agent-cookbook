@@ -21,7 +21,8 @@ class TelnyxClient:
     async def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.post(f"{self.base_url}{path}", headers=self.headers, json=payload)
-        response.raise_for_status()
+        if response.is_error:
+            raise RuntimeError(f"Telnyx POST {path} failed {response.status_code}: {response.text}")
         return response.json()
 
     async def dial(self, *, to: str, from_number: str, connection_id: str, webhook_url: str, client_state: dict[str, Any]) -> dict[str, Any]:
@@ -108,4 +109,3 @@ class TelnyxClient:
 def _encode_client_state(value: dict[str, Any]) -> str:
     raw = json.dumps(value, separators=(",", ":")).encode("utf-8")
     return base64.b64encode(raw).decode("ascii")
-
