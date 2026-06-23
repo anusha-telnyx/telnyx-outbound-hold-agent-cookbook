@@ -27,6 +27,21 @@ def test_normalizes_stringified_tool_arguments() -> None:
     assert request.reason == "front desk"
 
 
+def test_normalizes_nullable_wrapper_fields() -> None:
+    payload = {
+        "data": {
+            "call_control_id": None,
+            "arguments": '{"digits":"1","reason":"select reservations"}',
+        }
+    }
+
+    request = DtmfToolRequest.model_validate(normalize_tool_payload(payload))
+
+    assert request.call_control_id == ""
+    assert request.digits == "1"
+    assert request.reason == "select reservations"
+
+
 def test_normalizes_hold_detected_arguments() -> None:
     payload = {"parameters": {"reason": "queue prompt", "confidence": 0.9}}
 

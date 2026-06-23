@@ -7,6 +7,7 @@ import wave
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import Response
+from pydantic import ValidationError
 
 from .config import Settings, get_settings
 from .models import DtmfToolRequest, HoldDetectedToolRequest, OutboundCallRequest, normalize_tool_payload
@@ -36,7 +37,6 @@ async def health() -> dict[str, object]:
 
 @app.api_route("/fake-company/texml", methods=["GET", "POST"])
 async def fake_company_texml(request: Request) -> Response:
-    dtmf_url = _public_url(request, "/fake-company/dtmf/1.wav")
     action_url = _public_url(request, "/fake-company/menu")
     body = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -45,7 +45,6 @@ async def fake_company_texml(request: Request) -> Response:
         f'<Gather action="{html.escape(action_url)}" input="dtmf" numDigits="1" timeout="8" validDigits="12">',
         _say("for reservations, press 1. for the front desk, press 2."),
         "</Gather>",
-        f"<Play>{html.escape(dtmf_url)}</Play>",
         "<Redirect>" + html.escape(action_url) + "</Redirect>",
         "</Response>",
     ]
@@ -57,7 +56,12 @@ async def fake_company_menu(request: Request) -> Response:
     data = await _request_values(request)
     selected = _first_value(data, "Digits", "digits", "dtmf")
     dtmf_url = _public_url(request, "/fake-company/dtmf/1.wav")
-    if selected and selected != "1":
+    if selected != "1":
+        if not selected:
+            return _texml_response(
+                _say("i did not receive a menu selection. connecting you to reservations."),
+                "<Redirect>" + html.escape(_public_url(request, "/fake-company/menu?Digits=1")) + "</Redirect>",
+            )
         return _texml_response(
             _say("for reservations, please press 1."),
             f'<Redirect>{html.escape(_public_url(request, "/fake-company/texml"))}</Redirect>',
@@ -144,50 +148,48 @@ async def telnyx_webhook(
 
 @app.post("/tools/send-dtmf")
 async def send_dtmf_tool(request: Request) -> dict[str, object]:
-    tool_request = DtmfToolRequest.model_validate(normalize_tool_payload(await request.json()))
+    try:
+        payload = await request.json()
+        tool_request = DtmfToolRequest.model_validate(normalize_tool_payload(payload))
+    except (json.JSONDecodeError, ValidationError, TypeError, ValueError) as exc:
+        return _tool_fallback("send_dtmf", f"invalid tool payload: {exc}")
     if not tool_request.digits:
-        raise HTTPException(status_code=400, detail="missing digits")
+        return _tool_fallback("send_dtmf", "missing digits")
     call_control_id = tool_request.call_control_id or _latest_active_call_control_id()
     if not call_control_id:
-        raise HTTPException(status_code=404, detail="no active call_control_id")
+        return _tool_fallback("send_dtmf", "no active call_control_id")
     try:
         response = await orchestrator.send_dtmf(call_control_id, tool_request.digits, tool_request.reason)
-    except RuntimeError as exc:
+    except Exception as exc:
         session = store.get_by_call_control_id(call_control_id)
         if session:
             session.events.append({"tool": "send_dtmf", "accepted": False, "error": str(exc)})
-        return {
-            "ok": True,
-            "accepted": False,
-            "tool": "send_dtmf",
-            "message": "dtmf request recorded but telnyx rejected the live action; continue listening silently.",
-        }
+        return _tool_fallback("send_dtmf", str(exc))
     return {"ok": True, "accepted": True, "tool": "send_dtmf", "telnyx_response": response}
 
 
 @app.post("/tools/hold-detected")
 async def hold_detected_tool(request: Request) -> dict[str, object]:
-    tool_request = HoldDetectedToolRequest.model_validate(normalize_tool_payload(await request.json()))
+    try:
+        payload = await request.json()
+        tool_request = HoldDetectedToolRequest.model_validate(normalize_tool_payload(payload))
+    except (json.JSONDecodeError, ValidationError, TypeError, ValueError) as exc:
+        return _tool_fallback("hold_detected", f"invalid tool payload: {exc}")
     call_control_id = tool_request.call_control_id or _latest_active_call_control_id()
     if not call_control_id:
-        raise HTTPException(status_code=404, detail="no active call_control_id")
+        return _tool_fallback("hold_detected", "no active call_control_id")
     session = store.get_by_call_control_id(call_control_id)
     if not session:
-        raise HTTPException(status_code=404, detail="unknown call_control_id")
+        return _tool_fallback("hold_detected", "unknown call_control_id")
     try:
         await orchestrator.enter_hold(
             session,
             tool_request.reason or "assistant hold-detected tool",
             tool_request.confidence,
         )
-    except RuntimeError as exc:
+    except Exception as exc:
         session.events.append({"tool": "hold_detected", "accepted": False, "error": str(exc)})
-        return {
-            "ok": True,
-            "accepted": False,
-            "tool": "hold_detected",
-            "message": "hold signal recorded; stay silent and let backend transcription continue monitoring.",
-        }
+        return _tool_fallback("hold_detected", str(exc))
     return session.public_dict()
 
 
@@ -224,6 +226,16 @@ def _texml_response(*events: str) -> Response:
 
 def _say(text: str) -> str:
     return f'<Say voice="{html.escape(FAKE_HOTEL_VOICE)}">{html.escape(text)}</Say>'
+
+
+def _tool_fallback(tool: str, reason: str) -> dict[str, object]:
+    return {
+        "ok": True,
+        "accepted": False,
+        "tool": tool,
+        "reason": reason,
+        "message": "tool request was handled by the demo backend fallback. do not say this out loud. stay silent and continue listening.",
+    }
 
 
 def _speech_gather(request: Request, *, step: str, prompt: str, timeout: int) -> str:

@@ -11,13 +11,13 @@ class OutboundCallRequest(BaseModel):
 
 
 class DtmfToolRequest(BaseModel):
-    call_control_id: str = ""
+    call_control_id: str | None = ""
     digits: str = ""
     reason: str = ""
 
 
 class HoldDetectedToolRequest(BaseModel):
-    call_control_id: str = ""
+    call_control_id: str | None = ""
     reason: str = ""
     confidence: float = 1.0
 
@@ -60,4 +60,4 @@ def normalize_tool_payload(payload: Any) -> dict[str, Any]:
         if source in normalized and target not in normalized:
             normalized[target] = normalized[source]
 
-    return normalized
+    return {key: value for key, value in normalized.items() if value is not None}

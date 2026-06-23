@@ -34,6 +34,37 @@ def test_send_dtmf_tool_returns_controlled_response_on_telnyx_error(monkeypatch)
     assert response.json()["accepted"] is False
 
 
+def test_send_dtmf_tool_returns_controlled_response_for_unknown_call() -> None:
+    response = TestClient(server.app).post(
+        "/tools/send-dtmf",
+        json={
+            "call_control_id": "unknown-call-control-id",
+            "digits": "1",
+            "reason": "select reservations",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert response.json()["accepted"] is False
+    assert "unknown" in response.json()["reason"]
+
+
+def test_send_dtmf_tool_returns_controlled_response_for_nullable_call_id() -> None:
+    response = TestClient(server.app).post(
+        "/tools/send-dtmf",
+        json={
+            "call_control_id": None,
+            "digits": "1",
+            "reason": "select reservations",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert response.json()["accepted"] is False
+
+
 def test_hold_detected_tool_returns_controlled_response_on_telnyx_error(monkeypatch) -> None:
     session = CallSession(
         session_id="hold-error-session",
@@ -62,3 +93,19 @@ def test_hold_detected_tool_returns_controlled_response_on_telnyx_error(monkeypa
     assert response.status_code == 200
     assert response.json()["ok"] is True
     assert response.json()["accepted"] is False
+
+
+def test_hold_detected_tool_returns_controlled_response_for_unknown_call() -> None:
+    response = TestClient(server.app).post(
+        "/tools/hold-detected",
+        json={
+            "call_control_id": "unknown-call-control-id",
+            "reason": "queue prompt",
+            "confidence": 0.9,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert response.json()["accepted"] is False
+    assert "unknown" in response.json()["reason"]
