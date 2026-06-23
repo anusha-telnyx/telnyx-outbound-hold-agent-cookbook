@@ -146,13 +146,6 @@ class CallOrchestrator:
             return
         session.transition(CallState.REPRESENTATIVE_DETECTED, reason)
 
-        if session.transcription_active:
-            await self.telnyx.stop_transcription(
-                call_control_id=session.call_control_id,
-                context={"session_id": session.session_id, "stage": "representative_detected"},
-            )
-            session.transcription_active = False
-
         await self.telnyx.start_ai_assistant(
             call_control_id=session.call_control_id,
             assistant_id=self.settings.telnyx_representative_assistant_id,
@@ -161,6 +154,13 @@ class CallOrchestrator:
         )
         session.active_assistant = "representative"
         session.transition(CallState.LIVE_CONVERSATION, "representative assistant started")
+
+        if session.transcription_active:
+            await self.telnyx.stop_transcription(
+                call_control_id=session.call_control_id,
+                context={"session_id": session.session_id, "stage": "live_conversation"},
+            )
+            session.transcription_active = False
 
     def _representative_greeting(self, session: CallSession) -> str:
         return f"hi, i am calling to {session.objective}."

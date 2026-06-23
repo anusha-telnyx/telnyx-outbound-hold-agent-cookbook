@@ -57,7 +57,11 @@ say exactly: please hold for the next available reservations agent. your call is
 
 then stay silent for about twelve seconds. do not ask questions during the hold period.
 
-after the hold, say exactly: thanks for holding. this is sarah with willow creek hotel reservations. i can help with that booking. may i have the guest name for the reservation?
+after the hold, say exactly: thanks for holding. this is sarah with willow creek hotel reservations.
+
+then stay silent for about five seconds so the caller side representative assistant can start speaking.
+
+if the caller has not started explaining the booking request after that pause, ask exactly: may i have the guest name for the reservation?
 
 then ask one booking question at a time. ask for check in date, number of nights, room type, and whether the caller wants you to reserve the available room.
 

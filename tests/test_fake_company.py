@@ -25,6 +25,8 @@ def test_fake_company_menu_enters_hold_then_pauses_for_representative_assistant(
     assert 'voice="Telnyx.Ultra.' in response.text
     assert "please hold for the next available reservations agent" in response.text
     assert "thanks for holding, this is sarah with willow creek hotel reservations" in response.text
+    assert '<Pause length="5"/>' in response.text
+    assert "may i have the guest name for the reservation" in response.text
     assert '<Pause length="60"/>' in response.text
     assert "/fake-company/reservation" not in response.text
 
