@@ -83,12 +83,18 @@ async def telnyx_webhook(
 
 @app.post("/tools/send-dtmf")
 async def send_dtmf_tool(request: DtmfToolRequest) -> dict[str, object]:
-    return await orchestrator.send_dtmf(request.call_control_id, request.digits, request.reason)
+    call_control_id = request.call_control_id or _latest_active_call_control_id()
+    if not call_control_id:
+        raise HTTPException(status_code=404, detail="no active call_control_id")
+    return await orchestrator.send_dtmf(call_control_id, request.digits, request.reason)
 
 
 @app.post("/tools/hold-detected")
 async def hold_detected_tool(request: HoldDetectedToolRequest) -> dict[str, object]:
-    session = store.get_by_call_control_id(request.call_control_id)
+    call_control_id = request.call_control_id or _latest_active_call_control_id()
+    if not call_control_id:
+        raise HTTPException(status_code=404, detail="no active call_control_id")
+    session = store.get_by_call_control_id(call_control_id)
     if not session:
         raise HTTPException(status_code=404, detail="unknown call_control_id")
     await orchestrator.enter_hold(session, request.reason or "assistant hold-detected tool", request.confidence)
@@ -106,3 +112,10 @@ async def get_session(session_id: str) -> dict[str, object]:
     if not session:
         raise HTTPException(status_code=404, detail="unknown session_id")
     return session.public_dict()
+
+
+def _latest_active_call_control_id() -> str:
+    for session in reversed(store.all()):
+        if session.call_control_id and session.state.value not in {"call_ended", "failed"}:
+            return session.call_control_id
+    return ""

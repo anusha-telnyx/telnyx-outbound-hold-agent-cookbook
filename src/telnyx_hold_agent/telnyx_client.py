@@ -49,12 +49,6 @@ class TelnyxClient:
             "assistant": {"id": assistant_id},
             "client_state": _encode_client_state(context),
             "command_id": str(uuid4()),
-            "message_history": [
-                {
-                    "role": "system",
-                    "content": "call context: " + json.dumps(context, separators=(",", ":")),
-                }
-            ],
         }
         if greeting is not None:
             payload["greeting"] = greeting

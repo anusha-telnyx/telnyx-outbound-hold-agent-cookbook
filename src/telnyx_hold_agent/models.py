@@ -11,13 +11,12 @@ class OutboundCallRequest(BaseModel):
 
 
 class DtmfToolRequest(BaseModel):
-    call_control_id: str
+    call_control_id: str = ""
     digits: str
     reason: str = ""
 
 
 class HoldDetectedToolRequest(BaseModel):
-    call_control_id: str
+    call_control_id: str = ""
     reason: str = ""
     confidence: float = 1.0
-
