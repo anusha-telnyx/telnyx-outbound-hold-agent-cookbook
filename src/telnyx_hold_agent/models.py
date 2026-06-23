@@ -22,6 +22,11 @@ class HoldDetectedToolRequest(BaseModel):
     confidence: float = 1.0
 
 
+class EndCallToolRequest(BaseModel):
+    call_control_id: str | None = ""
+    reason: str = ""
+
+
 def normalize_tool_payload(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         return {}
@@ -55,6 +60,8 @@ def normalize_tool_payload(payload: Any) -> dict[str, Any]:
         "dtmf": "digits",
         "dtmf_digits": "digits",
         "digits": "digits",
+        "callReason": "reason",
+        "reason": "reason",
     }
     for source, target in aliases.items():
         if source in normalized and target not in normalized:

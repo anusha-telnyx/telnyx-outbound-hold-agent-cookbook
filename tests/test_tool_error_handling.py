@@ -109,3 +109,52 @@ def test_hold_detected_tool_returns_controlled_response_for_unknown_call() -> No
     assert response.json()["ok"] is True
     assert response.json()["accepted"] is False
     assert "unknown" in response.json()["reason"]
+
+
+def test_end_call_tool_hangs_up_active_call(monkeypatch) -> None:
+    session = CallSession(
+        session_id="end-call-session",
+        to="+15550000004",
+        from_number="+15550000002",
+        objective="test",
+        call_control_id="end-call-control-id",
+        state=CallState.LIVE_CONVERSATION,
+    )
+    server.store.add(session)
+
+    async def end_call(call_control_id: str, reason: str = "") -> dict[str, object]:
+        assert call_control_id == "end-call-control-id"
+        assert reason == "reservation complete"
+        session.transition(CallState.CALL_ENDED, reason)
+        return {"data": {"result": "ok"}}
+
+    monkeypatch.setattr(server.orchestrator, "end_call", end_call)
+
+    response = TestClient(server.app).post(
+        "/tools/end-call",
+        json={
+            "call_control_id": "end-call-control-id",
+            "reason": "reservation complete",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert response.json()["accepted"] is True
+    assert response.json()["tool"] == "end_call"
+    assert session.state == CallState.CALL_ENDED
+
+
+def test_end_call_tool_returns_controlled_response_for_unknown_call() -> None:
+    response = TestClient(server.app).post(
+        "/tools/end-call",
+        json={
+            "call_control_id": "unknown-call-control-id",
+            "reason": "done",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert response.json()["accepted"] is False
+    assert "unknown" in response.json()["reason"]

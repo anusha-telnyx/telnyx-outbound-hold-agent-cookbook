@@ -92,6 +92,19 @@ class CallOrchestrator:
         session.events.append({"at": datetime.now(UTC).isoformat(), "dtmf_sent": digits, "reason": reason})
         return response
 
+    async def end_call(self, call_control_id: str, reason: str = "") -> dict[str, Any]:
+        session = self.store.get_by_call_control_id(call_control_id)
+        if not session:
+            raise ValueError("unknown call_control_id")
+        response = await self.telnyx.hangup(
+            call_control_id=call_control_id,
+            context={"session_id": session.session_id, "reason": reason, "stage": session.state.value},
+        )
+        session.active_assistant = None
+        session.transcription_active = False
+        session.transition(CallState.CALL_ENDED, reason or "assistant end-call tool")
+        return response
+
     async def enter_hold(self, session: CallSession, reason: str, confidence: float) -> None:
         if session.state == CallState.HOLD_MONITORING:
             return

@@ -197,7 +197,7 @@ The state machine lives in `src/telnyx_hold_agent/orchestrator.py`.
 
 ## Assistant Tool Endpoints
 
-Configure the IVR assistant with backend tools that call these URLs:
+Configure the assistants with backend tools that call these URLs:
 
 ### Send DTMF
 
@@ -228,6 +228,23 @@ Body:
   "call_control_id": "v3:...",
   "reason": "ivr said please hold for the next representative",
   "confidence": 0.95
+}
+```
+
+### End Call
+
+Use this on the representative assistant, or on an optional demo target assistant that should end the shared demo call after the task is complete.
+
+```txt
+POST /tools/end-call
+```
+
+Body:
+
+```json
+{
+  "call_control_id": "v3:...",
+  "reason": "reservation confirmed and both sides said goodbye"
 }
 ```
 

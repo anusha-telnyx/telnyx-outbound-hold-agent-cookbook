@@ -10,7 +10,7 @@ from fastapi.responses import Response
 from pydantic import ValidationError
 
 from .config import Settings, get_settings
-from .models import DtmfToolRequest, HoldDetectedToolRequest, OutboundCallRequest, normalize_tool_payload
+from .models import DtmfToolRequest, EndCallToolRequest, HoldDetectedToolRequest, OutboundCallRequest, normalize_tool_payload
 from .orchestrator import CallOrchestrator
 from .security import verify_telnyx_signature
 from .state import InMemoryCallStore
@@ -20,7 +20,7 @@ settings: Settings = get_settings()
 store = InMemoryCallStore()
 telnyx = TelnyxClient(settings)
 orchestrator = CallOrchestrator(settings, store, telnyx)
-FAKE_HOTEL_VOICE = "Telnyx.Ultra.0c8ed86e-6c64-40f0-b252-b773911de6bb"
+FAKE_HOTEL_VOICE = "Telnyx.Ultra.1242fb95-7ddd-44ac-8a05-9e8a22a6137d"
 
 app = FastAPI(
     title="Telnyx Outbound Hold Agent Cookbook",
@@ -161,6 +161,26 @@ async def hold_detected_tool(request: Request) -> dict[str, object]:
         session.events.append({"tool": "hold_detected", "accepted": False, "error": str(exc)})
         return _tool_fallback("hold_detected", str(exc))
     return session.public_dict()
+
+
+@app.post("/tools/end-call")
+async def end_call_tool(request: Request) -> dict[str, object]:
+    try:
+        payload = await request.json()
+        tool_request = EndCallToolRequest.model_validate(normalize_tool_payload(payload))
+    except (json.JSONDecodeError, ValidationError, TypeError, ValueError) as exc:
+        return _tool_fallback("end_call", f"invalid tool payload: {exc}")
+    call_control_id = tool_request.call_control_id or _latest_active_call_control_id()
+    if not call_control_id:
+        return _tool_fallback("end_call", "no active call_control_id")
+    try:
+        response = await orchestrator.end_call(call_control_id, tool_request.reason)
+    except Exception as exc:
+        session = store.get_by_call_control_id(call_control_id)
+        if session:
+            session.events.append({"tool": "end_call", "accepted": False, "error": str(exc)})
+        return _tool_fallback("end_call", str(exc))
+    return {"ok": True, "accepted": True, "tool": "end_call", "telnyx_response": response}
 
 
 @app.get("/sessions")
