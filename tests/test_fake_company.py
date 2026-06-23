@@ -9,6 +9,7 @@ def test_fake_company_texml_starts_with_dtmf_menu() -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/xml")
     assert "willow creek hotel" in response.text
+    assert 'voice="Telnyx.Ultra.' in response.text
     assert 'input="dtmf"' in response.text
     assert "/fake-company/menu" in response.text
     assert "for reservations, press 1" in response.text
@@ -20,6 +21,7 @@ def test_fake_company_menu_enters_hold_then_waits_for_speech() -> None:
 
     assert response.status_code == 200
     assert "<Play>" in response.text
+    assert 'voice="Telnyx.Ultra.' in response.text
     assert "please hold for the next available reservations agent" in response.text
     assert "thanks for holding, this is sarah with willow creek hotel reservations" in response.text
     assert 'input="speech"' in response.text

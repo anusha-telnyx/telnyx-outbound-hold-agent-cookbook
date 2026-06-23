@@ -19,6 +19,7 @@ settings: Settings = get_settings()
 store = InMemoryCallStore()
 telnyx = TelnyxClient(settings)
 orchestrator = CallOrchestrator(settings, store, telnyx)
+FAKE_HOTEL_VOICE = "Telnyx.Ultra.0c8ed86e-6c64-40f0-b252-b773911de6bb"
 
 app = FastAPI(
     title="Telnyx Outbound Hold Agent Cookbook",
@@ -40,9 +41,9 @@ async def fake_company_texml(request: Request) -> Response:
     body = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         "<Response>",
-        "<Say>thank you for calling willow creek hotel.</Say>",
+        _say("thank you for calling willow creek hotel."),
         f'<Gather action="{html.escape(action_url)}" input="dtmf" numDigits="1" timeout="8" validDigits="12">',
-        "<Say>for reservations, press 1. for the front desk, press 2.</Say>",
+        _say("for reservations, press 1. for the front desk, press 2."),
         "</Gather>",
         f"<Play>{html.escape(dtmf_url)}</Play>",
         "<Redirect>" + html.escape(action_url) + "</Redirect>",
@@ -58,16 +59,16 @@ async def fake_company_menu(request: Request) -> Response:
     dtmf_url = _public_url(request, "/fake-company/dtmf/1.wav")
     if selected and selected != "1":
         return _texml_response(
-            "<Say>for reservations, please press 1.</Say>",
+            _say("for reservations, please press 1."),
             f'<Redirect>{html.escape(_public_url(request, "/fake-company/texml"))}</Redirect>',
         )
 
     return _texml_response(
         f"<Play>{html.escape(dtmf_url)}</Play>",
-        "<Say>reservations. one moment while i connect you.</Say>",
-        "<Say>please hold for the next available reservations agent.</Say>",
-        "<Say>your call is important to us.</Say>",
-        '<Pause length="7"/>',
+        _say("reservations. one moment while i connect you."),
+        _say("please hold for the next available reservations agent."),
+        _say("your call is important to us."),
+        '<Pause length="3"/>',
         _speech_gather(
             request,
             step="guest_name",
@@ -84,13 +85,13 @@ async def fake_company_reservation(request: Request, step: str = "guest_name") -
     next_step = RESERVATION_STEPS.get(step, RESERVATION_STEPS["guest_name"])
     events = []
     if speech:
-        events.append(f"<Say>{html.escape(next_step['ack'])}</Say>")
+        events.append(_say(str(next_step["ack"])))
 
     if next_step.get("done"):
         events.extend(
             [
-                "<Say>great. i have reserved a standard room for alex morgan for one night starting june thirtieth, twenty twenty six. the estimated rate is under two hundred fifty dollars before taxes, and i added a quiet room request.</Say>",
-                "<Say>thank you for calling willow creek hotel. goodbye.</Say>",
+                _say("great. i have reserved a standard room for alex morgan for one night starting june thirtieth, twenty twenty six. the estimated rate is under two hundred fifty dollars before taxes, and i added a quiet room request."),
+                _say("thank you for calling willow creek hotel. goodbye."),
                 "<Hangup/>",
             ]
         )
@@ -149,7 +150,19 @@ async def send_dtmf_tool(request: Request) -> dict[str, object]:
     call_control_id = tool_request.call_control_id or _latest_active_call_control_id()
     if not call_control_id:
         raise HTTPException(status_code=404, detail="no active call_control_id")
-    return await orchestrator.send_dtmf(call_control_id, tool_request.digits, tool_request.reason)
+    try:
+        response = await orchestrator.send_dtmf(call_control_id, tool_request.digits, tool_request.reason)
+    except RuntimeError as exc:
+        session = store.get_by_call_control_id(call_control_id)
+        if session:
+            session.events.append({"tool": "send_dtmf", "accepted": False, "error": str(exc)})
+        return {
+            "ok": True,
+            "accepted": False,
+            "tool": "send_dtmf",
+            "message": "dtmf request recorded but telnyx rejected the live action; continue listening silently.",
+        }
+    return {"ok": True, "accepted": True, "tool": "send_dtmf", "telnyx_response": response}
 
 
 @app.post("/tools/hold-detected")
@@ -161,11 +174,20 @@ async def hold_detected_tool(request: Request) -> dict[str, object]:
     session = store.get_by_call_control_id(call_control_id)
     if not session:
         raise HTTPException(status_code=404, detail="unknown call_control_id")
-    await orchestrator.enter_hold(
-        session,
-        tool_request.reason or "assistant hold-detected tool",
-        tool_request.confidence,
-    )
+    try:
+        await orchestrator.enter_hold(
+            session,
+            tool_request.reason or "assistant hold-detected tool",
+            tool_request.confidence,
+        )
+    except RuntimeError as exc:
+        session.events.append({"tool": "hold_detected", "accepted": False, "error": str(exc)})
+        return {
+            "ok": True,
+            "accepted": False,
+            "tool": "hold_detected",
+            "message": "hold signal recorded; stay silent and let backend transcription continue monitoring.",
+        }
     return session.public_dict()
 
 
@@ -200,6 +222,10 @@ def _texml_response(*events: str) -> Response:
     return Response(content="\n".join(body), media_type="application/xml")
 
 
+def _say(text: str) -> str:
+    return f'<Say voice="{html.escape(FAKE_HOTEL_VOICE)}">{html.escape(text)}</Say>'
+
+
 def _speech_gather(request: Request, *, step: str, prompt: str, timeout: int) -> str:
     action = _public_url(request, f"/fake-company/reservation?step={step}")
     return "\n".join(
@@ -209,7 +235,7 @@ def _speech_gather(request: Request, *, step: str, prompt: str, timeout: int) ->
                 'speechTimeout="auto" transcriptionEngine="Deepgram" model="deepgram/nova-3" '
                 'language="en-US">'
             ),
-            f"<Say>{html.escape(prompt)}</Say>",
+            _say(prompt),
             "</Gather>",
             f'<Redirect>{html.escape(action)}</Redirect>',
         ]

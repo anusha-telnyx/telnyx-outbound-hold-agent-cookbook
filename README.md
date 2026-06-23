@@ -109,6 +109,8 @@ https://YOUR-NGROK-DOMAIN/fake-company/texml
 
 The fake hotel answers as Willow Creek Hotel, plays a reservations menu, plays an audible DTMF tone when option 1 is selected, places the caller on hold, then returns as a reservations representative. The representative side uses speech gathers between questions, so it waits for the assistant's response before moving to the next booking step.
 
+The fake hotel is a TeXML test fixture served by this FastAPI app, not a third Telnyx AI Assistant. It will not appear in the AI Assistants portal. The two AI Assistants in this cookbook are still the outbound IVR navigation assistant and the outbound representative interaction assistant.
+
 ## Local Webhook URL
 
 Telnyx webhooks must reach your machine over HTTPS. For local development, run a tunnel:
