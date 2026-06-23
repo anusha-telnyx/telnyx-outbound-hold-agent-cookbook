@@ -132,20 +132,6 @@ In terminal logs or Telnyx Conversation Insights, expect to see:
 - Both sides saying goodbye once.
 - `end_call` called by the representative assistant.
 
-## Recording Checklist
-
-For a short demo recording, show:
-
-- The local server running with `hold-agent serve`.
-- The outbound call command using the fake hotel number.
-- Telnyx Conversation Insights for the call.
-- The fake hotel greeting and reservations menu.
-- The `send_dtmf` tool call and audible DTMF selection.
-- The hold phrase and assistant stop behavior.
-- The representative assistant starting with prior context.
-- The hotel booking confirmation.
-- Both sides saying goodbye once.
-- The `end_call` tool call ending the call.
 
 ## Notes
 
