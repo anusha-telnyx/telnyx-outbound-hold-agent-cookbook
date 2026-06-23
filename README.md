@@ -95,13 +95,21 @@ In another terminal, place a call:
 
 ```bash
 hold-agent call \
-  --to +15557654321 \
+  --to +16282564467 \
   --target-company "Willow Creek Hotel" \
   --objective "book a one-night hotel reservation for one guest" \
   --context-json '{"guest_name":"Alex Morgan","check_in_date":"2026-06-30","nights":1,"room_type":"standard room","budget":"under 250 dollars before taxes","special_requests":"quiet room if available"}'
 ```
 
-For a safe end-to-end local demo, point a Telnyx number at this app's fake hotel endpoint and call that number. The fake hotel endpoint lives at:
+For a safe end-to-end A2A demo, create a third Telnyx AI Assistant that acts as the called company. In the demo setup used while building this cookbook:
+
+- Fake hotel assistant: `Demo Fake Hotel - Willow Creek Reservations`
+- Fake hotel assistant ID: `assistant-0d9b2051-aa12-4b6b-aa8c-7a7999fd4933`
+- Fake hotel number: `+16282564467`
+
+That fake hotel assistant is separate from the two cookbook assistants. The cookbook still uses one assistant for IVR navigation and one assistant for the representative/task stage.
+
+The older TeXML fake company endpoint remains available as a low-level smoke test, but it is not the recommended demo for A2A conversation:
 
 ```txt
 https://YOUR-NGROK-DOMAIN/fake-company/texml
