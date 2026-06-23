@@ -49,7 +49,7 @@ The key idea is that the AI assistant should not spend full assistant runtime on
 10. The backend starts transcription-only monitoring with `transcription_start`.
 11. While on hold, the backend watches transcript snippets for representative pickup.
 12. When a representative is detected, the backend stops hold transcription if needed.
-13. The backend starts the representative assistant with the original call context and recent transcript.
+13. The backend starts the representative assistant with the original call context, recent transcript, and a short opening greeting that restates the objective.
 14. The representative assistant completes the call objective and the call eventually ends.
 
 ## Built-In Fake Hotel Demo
@@ -111,6 +111,7 @@ The representative assistant starts after a human is detected. It should:
 
 - use the original objective and approved context.
 - avoid repeating the IVR path unless asked.
+- start with a short opener because the representative greeting was already used as the pickup signal.
 - answer the representative's questions.
 - complete the hotel reservation task or other assigned business task.
 - disclose only information that was supplied for the call.

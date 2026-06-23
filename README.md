@@ -29,7 +29,7 @@ outbound call
 - Stops the active AI assistant during hold with `ai_assistant_stop`.
 - Starts real-time transcription during hold with `transcription_start`.
 - Detects representative pickup from `call.unhold` or transcript phrases.
-- Stops hold transcription and starts a representative interaction assistant with call context.
+- Stops hold transcription and starts a representative interaction assistant with call context and a short objective-restating opener.
 
 ## How It Works
 

@@ -157,10 +157,13 @@ class CallOrchestrator:
             call_control_id=session.call_control_id,
             assistant_id=self.settings.telnyx_representative_assistant_id,
             context=self._assistant_context(session),
-            greeting="",
+            greeting=self._representative_greeting(session),
         )
         session.active_assistant = "representative"
         session.transition(CallState.LIVE_CONVERSATION, "representative assistant started")
+
+    def _representative_greeting(self, session: CallSession) -> str:
+        return f"hi, i am calling to {session.objective}."
 
     def _assistant_context(self, session: CallSession) -> dict[str, Any]:
         hold_seconds = None
@@ -209,4 +212,3 @@ def extract_transcript(payload: dict[str, Any]) -> str:
 
     walk(payload)
     return next((candidate.strip() for candidate in candidates if candidate.strip()), "")
-
