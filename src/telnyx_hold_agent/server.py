@@ -1,6 +1,8 @@
+import html
 import json
 
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.responses import Response
 
 from .config import Settings, get_settings
 from .models import DtmfToolRequest, HoldDetectedToolRequest, OutboundCallRequest
@@ -25,6 +27,31 @@ app = FastAPI(
 async def health() -> dict[str, object]:
     missing = settings.required_missing()
     return {"ok": not missing, "missing": missing}
+
+
+@app.api_route("/fake-company/texml", methods=["GET", "POST"])
+async def fake_company_texml() -> Response:
+    script = [
+        "thank you for calling willow creek hotel.",
+        "for reservations, press 1. for the front desk, press 2.",
+        "please hold for the next available reservations agent.",
+        "your call is important to us.",
+        "thanks for holding, this is sarah at the willow creek hotel front desk. how can i help you?",
+    ]
+    body = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        "<Response>",
+        f"<Say>{html.escape(script[0])}</Say>",
+        f"<Say>{html.escape(script[1])}</Say>",
+        '<Pause length="3"/>',
+        f"<Say>{html.escape(script[2])}</Say>",
+        f"<Say>{html.escape(script[3])}</Say>",
+        '<Pause length="12"/>',
+        f"<Say>{html.escape(script[4])}</Say>",
+        '<Pause length="30"/>',
+        "</Response>",
+    ]
+    return Response(content="\n".join(body), media_type="application/xml")
 
 
 @app.post("/calls/outbound")
@@ -79,4 +106,3 @@ async def get_session(session_id: str) -> dict[str, object]:
     if not session:
         raise HTTPException(status_code=404, detail="unknown session_id")
     return session.public_dict()
-

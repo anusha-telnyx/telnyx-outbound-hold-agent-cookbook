@@ -96,9 +96,18 @@ In another terminal, place a call:
 ```bash
 hold-agent call \
   --to +15557654321 \
-  --target-company "example insurance" \
-  --objective "reach eligibility and verify coverage for the provided member"
+  --target-company "Willow Creek Hotel" \
+  --objective "book a one-night hotel reservation for one guest" \
+  --context-json '{"guest_name":"Alex Morgan","check_in_date":"2026-06-30","nights":1,"room_type":"standard room","budget":"under 250 dollars before taxes","special_requests":"quiet room if available"}'
 ```
+
+For a safe end-to-end local demo, point a Telnyx number at this app's fake hotel endpoint and call that number. The fake hotel endpoint lives at:
+
+```txt
+https://YOUR-NGROK-DOMAIN/fake-company/texml
+```
+
+The fake hotel answers as Willow Creek Hotel, plays a reservations menu, places the caller on hold, then returns as a front desk representative.
 
 ## Local Webhook URL
 
@@ -132,6 +141,7 @@ The default local run path needs only these values:
 | `TELNYX_IVR_ASSISTANT_ID` | Assistant started after `call.answered`. |
 | `TELNYX_REPRESENTATIVE_ASSISTANT_ID` | Assistant started after representative pickup. |
 | `PUBLIC_BASE_URL` | Public HTTPS base URL for Telnyx webhooks. |
+| `START_TRANSCRIPTION_DURING_IVR` | Defaults to `true` so the backend can detect hold phrases during the demo even if the assistant tool is not configured perfectly. |
 
 ## Assistant Setup
 
@@ -147,6 +157,8 @@ Add the representative assistant ID to `TELNYX_REPRESENTATIVE_ASSISTANT_ID`.
 If you want the IVR assistant to press phone menu options, configure an assistant tool that calls this app's `/tools/send-dtmf` endpoint.
 
 If you want the IVR assistant to explicitly signal hold, configure an assistant tool that calls this app's `/tools/hold-detected` endpoint.
+
+The IVR assistant should call the hold tool silently. It should not say "hold detected" out loud to the remote party.
 
 ## State Machine
 

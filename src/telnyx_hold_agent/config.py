@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     app_host: str = Field(default="0.0.0.0", alias="APP_HOST")
     app_port: int = Field(default=8000, alias="APP_PORT")
 
-    start_transcription_during_ivr: bool = Field(default=False, alias="START_TRANSCRIPTION_DURING_IVR")
+    start_transcription_during_ivr: bool = Field(default=True, alias="START_TRANSCRIPTION_DURING_IVR")
     transcription_engine: str = Field(default="Deepgram", alias="TRANSCRIPTION_ENGINE")
     transcription_model: str = Field(default="deepgram/nova-3", alias="TRANSCRIPTION_MODEL")
     transcription_language: str = Field(default="en", alias="TRANSCRIPTION_LANGUAGE")
@@ -48,4 +48,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
