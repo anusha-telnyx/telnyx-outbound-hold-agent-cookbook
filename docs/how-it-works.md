@@ -71,9 +71,12 @@ The fake hotel behaves like this:
 ```txt
 willow creek hotel answers
 -> says "for reservations, press 1"
+-> plays an audible dtmf 1 tone
 -> says "please hold for the next available reservations agent"
 -> waits briefly
--> says "thanks for holding, this is sarah at the willow creek hotel front desk"
+-> says "thanks for holding, this is sarah with willow creek hotel reservations"
+-> asks for guest name, check-in date, number of nights, room type, and confirmation
+-> confirms the sample reservation details
 ```
 
 Call that fake hotel number with:
