@@ -135,6 +135,7 @@ def test_end_call_tool_hangs_up_active_call(monkeypatch) -> None:
         json={
             "call_control_id": "end-call-control-id",
             "reason": "reservation complete",
+            "delay_seconds": 0,
         },
     )
 

@@ -244,9 +244,12 @@ Body:
 ```json
 {
   "call_control_id": "v3:...",
-  "reason": "reservation confirmed and both sides said goodbye"
+  "reason": "reservation confirmed and both sides said goodbye",
+  "delay_seconds": 3
 }
 ```
+
+`delay_seconds` is optional and defaults to `3`. The delay gives the final goodbye audio time to finish before the backend sends Telnyx `hangup`.
 
 ## Assistant Prompts
 

@@ -25,6 +25,7 @@ class HoldDetectedToolRequest(BaseModel):
 class EndCallToolRequest(BaseModel):
     call_control_id: str | None = ""
     reason: str = ""
+    delay_seconds: float = 3.0
 
 
 def normalize_tool_payload(payload: Any) -> dict[str, Any]:
@@ -62,6 +63,8 @@ def normalize_tool_payload(payload: Any) -> dict[str, Any]:
         "digits": "digits",
         "callReason": "reason",
         "reason": "reason",
+        "delaySeconds": "delay_seconds",
+        "delay_seconds": "delay_seconds",
     }
     for source, target in aliases.items():
         if source in normalized and target not in normalized:

@@ -1,3 +1,4 @@
+import asyncio
 import html
 import io
 import json
@@ -174,6 +175,9 @@ async def end_call_tool(request: Request) -> dict[str, object]:
     if not call_control_id:
         return _tool_fallback("end_call", "no active call_control_id")
     try:
+        delay_seconds = max(0.0, min(tool_request.delay_seconds, 5.0))
+        if delay_seconds:
+            await asyncio.sleep(delay_seconds)
         response = await orchestrator.end_call(call_control_id, tool_request.reason)
     except Exception as exc:
         session = store.get_by_call_control_id(call_control_id)
