@@ -5,7 +5,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import Response
 
 from .config import Settings, get_settings
-from .models import DtmfToolRequest, HoldDetectedToolRequest, OutboundCallRequest
+from .models import DtmfToolRequest, HoldDetectedToolRequest, OutboundCallRequest, normalize_tool_payload
 from .orchestrator import CallOrchestrator
 from .security import verify_telnyx_signature
 from .state import InMemoryCallStore
@@ -82,22 +82,30 @@ async def telnyx_webhook(
 
 
 @app.post("/tools/send-dtmf")
-async def send_dtmf_tool(request: DtmfToolRequest) -> dict[str, object]:
-    call_control_id = request.call_control_id or _latest_active_call_control_id()
+async def send_dtmf_tool(request: Request) -> dict[str, object]:
+    tool_request = DtmfToolRequest.model_validate(normalize_tool_payload(await request.json()))
+    if not tool_request.digits:
+        raise HTTPException(status_code=400, detail="missing digits")
+    call_control_id = tool_request.call_control_id or _latest_active_call_control_id()
     if not call_control_id:
         raise HTTPException(status_code=404, detail="no active call_control_id")
-    return await orchestrator.send_dtmf(call_control_id, request.digits, request.reason)
+    return await orchestrator.send_dtmf(call_control_id, tool_request.digits, tool_request.reason)
 
 
 @app.post("/tools/hold-detected")
-async def hold_detected_tool(request: HoldDetectedToolRequest) -> dict[str, object]:
-    call_control_id = request.call_control_id or _latest_active_call_control_id()
+async def hold_detected_tool(request: Request) -> dict[str, object]:
+    tool_request = HoldDetectedToolRequest.model_validate(normalize_tool_payload(await request.json()))
+    call_control_id = tool_request.call_control_id or _latest_active_call_control_id()
     if not call_control_id:
         raise HTTPException(status_code=404, detail="no active call_control_id")
     session = store.get_by_call_control_id(call_control_id)
     if not session:
         raise HTTPException(status_code=404, detail="unknown call_control_id")
-    await orchestrator.enter_hold(session, request.reason or "assistant hold-detected tool", request.confidence)
+    await orchestrator.enter_hold(
+        session,
+        tool_request.reason or "assistant hold-detected tool",
+        tool_request.confidence,
+    )
     return session.public_dict()
 
 

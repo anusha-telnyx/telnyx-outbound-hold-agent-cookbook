@@ -12,7 +12,7 @@ class OutboundCallRequest(BaseModel):
 
 class DtmfToolRequest(BaseModel):
     call_control_id: str = ""
-    digits: str
+    digits: str = ""
     reason: str = ""
 
 
@@ -20,3 +20,44 @@ class HoldDetectedToolRequest(BaseModel):
     call_control_id: str = ""
     reason: str = ""
     confidence: float = 1.0
+
+
+def normalize_tool_payload(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {}
+
+    candidate = payload.get("data", payload)
+    if not isinstance(candidate, dict):
+        candidate = payload
+
+    arguments = (
+        candidate.get("arguments")
+        or candidate.get("args")
+        or candidate.get("parameters")
+        or candidate.get("payload")
+    )
+    if isinstance(arguments, str):
+        try:
+            import json
+
+            arguments = json.loads(arguments)
+        except json.JSONDecodeError:
+            arguments = {}
+
+    if isinstance(arguments, dict):
+        normalized = {**candidate, **arguments}
+    else:
+        normalized = dict(candidate)
+
+    aliases = {
+        "callControlId": "call_control_id",
+        "call_control_id": "call_control_id",
+        "dtmf": "digits",
+        "dtmf_digits": "digits",
+        "digits": "digits",
+    }
+    for source, target in aliases.items():
+        if source in normalized and target not in normalized:
+            normalized[target] = normalized[source]
+
+    return normalized
