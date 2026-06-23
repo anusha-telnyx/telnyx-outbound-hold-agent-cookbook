@@ -95,29 +95,14 @@ In another terminal, place a call:
 
 ```bash
 hold-agent call \
-  --to +16282564467 \
-  --target-company "Willow Creek Hotel" \
-  --objective "book a one-night hotel reservation for one guest" \
-  --context-json '{"guest_name":"Alex Morgan","check_in_date":"2026-06-30","nights":1,"room_type":"standard room","budget":"under 250 dollars before taxes","special_requests":"quiet room if available"}'
+  --to +15557654321 \
+  --target-company "example insurance" \
+  --objective "reach eligibility and verify coverage for the provided member"
 ```
 
-For a safe end-to-end A2A demo, create a third Telnyx AI Assistant that acts as the called company. In the demo setup used while building this cookbook:
+## Demo-Only Example
 
-- Fake hotel assistant: `Demo Fake Hotel - Willow Creek Reservations`
-- Fake hotel assistant ID: `assistant-0d9b2051-aa12-4b6b-aa8c-7a7999fd4933`
-- Fake hotel number: `+16282564467`
-
-That fake hotel assistant is separate from the two cookbook assistants. The cookbook still uses one assistant for IVR navigation and one assistant for the representative/task stage.
-
-The older TeXML fake company endpoint remains available as a low-level smoke test, but it is not the recommended demo for A2A conversation:
-
-```txt
-https://YOUR-NGROK-DOMAIN/fake-company/texml
-```
-
-The fake hotel answers as Willow Creek Hotel, plays a reservations menu, plays an audible DTMF tone when option 1 is selected, places the caller on hold, then returns with a short representative pickup line and leaves the line open briefly. It is meant to test IVR navigation, hold detection, assistant stop, representative pickup detection, and second-assistant start. It is not meant to simulate a full live booking conversation.
-
-The fake hotel is a TeXML test fixture served by this FastAPI app, not a third Telnyx AI Assistant. It will not appear in the AI Assistants portal. The two AI Assistants in this cookbook are still the outbound IVR navigation assistant and the outbound representative interaction assistant.
+For a concrete agent-to-agent walkthrough, see [`examples/a2a-hotel-demo`](examples/a2a-hotel-demo). That folder is demo-only and shows how to use a third Telnyx AI Assistant as a fake hotel front desk target.
 
 ## Local Webhook URL
 
@@ -197,7 +182,7 @@ The state machine lives in `src/telnyx_hold_agent/orchestrator.py`.
 
 ## Assistant Tool Endpoints
 
-Configure the assistants with backend tools that call these URLs:
+Configure assistant tools with the relevant backend URLs:
 
 ### Send DTMF
 
@@ -233,7 +218,7 @@ Body:
 
 ### End Call
 
-Use this on the representative assistant, or on an optional demo target assistant that should end the shared demo call after the task is complete.
+Optionally configure the representative assistant with this tool so it can end the call after the task is complete.
 
 ```txt
 POST /tools/end-call
@@ -283,7 +268,7 @@ Start with phrase-based detection, then add richer signals as needed:
 pytest
 ```
 
-The included tests cover the detector behavior and basic Telnyx webhook payload extraction.
+The included tests cover detector behavior, webhook payload extraction, assistant tool payload handling, and the demo media endpoints.
 
 ## Troubleshooting
 

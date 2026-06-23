@@ -1,6 +1,6 @@
 # How the Telnyx Outbound Hold Agent Works
 
-This cookbook shows how to run an outbound AI phone agent on your own machine. The default demo calls a fake hotel front desk, navigates a reservations IVR, stops the AI assistant while the call is on hold, keeps the phone call connected, and then resumes with a front desk representative using the prior context.
+This cookbook shows how to run an outbound AI phone agent on your own machine. The agent calls a target company, navigates an IVR, stops the AI assistant while the call is on hold, keeps the phone call connected, and then resumes with a representative-facing assistant using the prior context.
 
 The goal is to give developers a small, runnable reference implementation rather than a full production dialer.
 
@@ -8,13 +8,13 @@ The goal is to give developers a small, runnable reference implementation rather
 
 ```txt
 you start an outbound call
--> Telnyx dials the fake hotel company
+-> Telnyx dials the target company
 -> when the call is answered, an IVR navigation AI assistant starts
--> the assistant listens to the reservations menu and can ask the backend to press DTMF keys
+-> the assistant listens to the IVR and can ask the backend to press DTMF keys
 -> when the call reaches hold or a queue, the backend stops the AI assistant
 -> the phone call stays connected
 -> the backend listens with transcription only
--> when a front desk representative answers, the backend starts a second AI assistant
+-> when a representative answers, the backend starts a second AI assistant
 -> that second assistant resumes with the original goal and recent context
 ```
 
@@ -52,85 +52,14 @@ The key idea is that the AI assistant should not spend full assistant runtime on
 13. The backend starts the representative assistant with the original call context, recent transcript, and a short opening greeting that restates the objective.
 14. The representative assistant completes the call objective and the call eventually ends.
 
-## Optional A2A Fake Hotel Demo
+## Demo-Only A2A Example
 
 The core cookbook uses two Telnyx AI Assistants:
 
 - IVR navigation assistant.
 - Representative interaction assistant.
 
-For a simple A2A demo, use a third assistant as the called company. This assistant is not part of the core cookbook logic; it is just a target number that behaves like a hotel reservations desk.
-
-Demo setup used while building this cookbook:
-
-```txt
-fake hotel assistant: demo fake hotel - willow creek reservations
-fake hotel assistant id: assistant-0d9b2051-aa12-4b6b-aa8c-7a7999fd4933
-fake hotel number: +16282564467
-```
-
-Call that fake hotel assistant number with:
-
-```bash
-hold-agent call \
-  --to +16282564467 \
-  --target-company "Willow Creek Hotel" \
-  --objective "book a one-night hotel reservation for one guest" \
-  --context-json '{"guest_name":"Alex Morgan","check_in_date":"2026-06-30","nights":1,"room_type":"standard room","budget":"under 250 dollars before taxes","special_requests":"quiet room if available"}'
-```
-
-Expected demo shape:
-
-```txt
-called hotel assistant presents a reservations menu
--> cookbook ivr assistant selects the reservations path
--> called hotel assistant says please hold
--> cookbook backend stops the ivr assistant
--> backend monitors hold with transcription
--> called hotel assistant returns as sarah from reservations
--> cookbook representative assistant starts with context
--> the two assistants complete the booking conversation
-```
-
-## Legacy TeXML Smoke Test
-
-The app also includes a fake hotel TeXML endpoint:
-
-```txt
-/fake-company/texml
-```
-
-Point a Telnyx number at this URL through your public tunnel:
-
-```txt
-https://YOUR-NGROK-DOMAIN/fake-company/texml
-```
-
-The fake hotel behaves like this:
-
-```txt
-willow creek hotel answers
--> says "for reservations, press 1"
--> plays an audible dtmf 1 tone
--> says "please hold for the next available reservations agent"
--> waits briefly
--> says "thanks for holding, this is sarah with willow creek hotel reservations"
--> leaves the line open briefly so the representative assistant can start
-```
-
-This TeXML endpoint is a low-level smoke test for IVR navigation, hold detection, assistant stop, representative pickup detection, and Assistant 2 startup. It is intentionally not a full conversational booking agent. For A2A demos, prefer the third fake hotel AI Assistant above.
-
-Call that fake hotel number with:
-
-```bash
-hold-agent call \
-  --to +15557654321 \
-  --target-company "Willow Creek Hotel" \
-  --objective "book a one-night hotel reservation for one guest" \
-  --context-json '{"guest_name":"Alex Morgan","check_in_date":"2026-06-30","nights":1,"room_type":"standard room","budget":"under 250 dollars before taxes","special_requests":"quiet room if available"}'
-```
-
-Replace `+15557654321` with the Telnyx number assigned to the fake hotel TeXML app.
+For a concrete agent-to-agent demo, see `examples/a2a-hotel-demo`. That example adds a third Telnyx AI Assistant as a fake hotel target. It is intentionally separate from the core cookbook logic.
 
 ## Why There Are Two Assistants
 
@@ -157,7 +86,7 @@ The representative assistant starts after a human is detected. It should:
 - avoid repeating the IVR path unless asked.
 - start with a short opener because the representative greeting was already used as the pickup signal.
 - answer the representative's questions.
-- complete the hotel reservation task or other assigned business task.
+- complete the assigned business task.
 - disclose only information that was supplied for the call.
 
 This separation keeps the prompt for each assistant narrow and makes the hold handoff explicit.
@@ -190,6 +119,8 @@ The code also defines additional states such as `hold_candidate`, `task_complete
 | `POST /webhooks/telnyx` | Receives Telnyx call lifecycle and transcription events. |
 | `POST /tools/send-dtmf` | Lets the IVR assistant request backend-owned menu key presses. |
 | `POST /tools/hold-detected` | Lets the IVR assistant explicitly tell the backend that hold was detected. |
+| `POST /tools/end-call` | Lets the representative assistant end the call after the task is complete. |
+| `GET /media/dtmf/{digit}.wav` | Serves short DTMF audio feedback for demos. |
 | `GET /sessions` | Lists local in-memory call sessions. |
 | `GET /sessions/{session_id}` | Shows one local in-memory call session. |
 
@@ -207,7 +138,7 @@ When the representative assistant starts, the backend passes relevant context fr
 
 This lets the second assistant resume the call without asking the representative to repeat information already collected from the IVR path.
 
-For the hotel demo, user-provided context might include guest name, check-in date, number of nights, room type, budget, and special requests. Use fake data for demos.
+For demos, user-provided context can include whatever information the representative assistant is allowed to disclose. Use fake data for recordings and examples.
 
 ## What Runs on Your Machine
 
