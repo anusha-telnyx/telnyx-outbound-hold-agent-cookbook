@@ -1,8 +1,6 @@
 # Building an Outbound Hold Agent
 
 
-# Building an outbound agent is easy until the call goes on hold
-
 The first version of an outbound voice agent seems simple: call a company, listen to the IVR, press the right menu option, and talk to a representative.
 
 Then the call goes on hold.
