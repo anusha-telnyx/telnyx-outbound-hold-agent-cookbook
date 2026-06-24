@@ -75,6 +75,82 @@ When hold is detected, the backend stops the IVR assistant and switches into tra
 
 When transcription indicates that a representative has returned, the backend starts the representative assistant with the objective and recent context. That keeps each assistant focused and makes the handoff an explicit system event instead of an implied behavior inside one prompt.
 
+## The core workflow in code
+
+The full implementation has more setup around FastAPI routes, Telnyx webhook verification, local state, and assistant tool payloads, but the core orchestration is small.
+
+When Telnyx sends call events to the backend, the orchestrator routes each event into the right part of the workflow:
+
+```python
+if event_type == "call.answered":
+    await self._start_ivr(session)
+elif event_type == "call.hold":
+    await self.enter_hold(session, reason="telnyx call.hold webhook", confidence=1.0)
+elif event_type == "call.unhold":
+    await self._representative_detected(session, reason="telnyx call.unhold webhook")
+elif event_type == "call.transcription" and transcript:
+    await self._handle_transcript(session, transcript)
+elif event_type == "call.hangup":
+    session.active_assistant = None
+    session.transcription_active = False
+    session.transition(CallState.CALL_ENDED, "telnyx call.hangup webhook")
+```
+
+The hold transition is the most important part of the pattern. The backend changes the local state, stops the active assistant, and makes sure transcription is running:
+
+```python
+async def enter_hold(self, session: CallSession, reason: str, confidence: float) -> None:
+    if session.state == CallState.HOLD_MONITORING:
+        return
+    session.transition(CallState.HOLD_MONITORING, reason, confidence=confidence)
+    session.hold_started_at = datetime.now(UTC)
+
+    if session.active_assistant:
+        await self.telnyx.stop_ai_assistant(
+            call_control_id=session.call_control_id,
+            context={"session_id": session.session_id, "stage": "hold_monitoring", "reason": reason},
+        )
+        session.active_assistant = None
+
+    if not session.transcription_active:
+        await self.telnyx.start_transcription(
+            call_control_id=session.call_control_id,
+            context={"session_id": session.session_id, "stage": "hold_monitoring"},
+        )
+        session.transcription_active = True
+```
+
+When the backend detects that a representative has answered, it starts the representative assistant with context from the original task and recent transcript:
+
+```python
+await self.telnyx.start_ai_assistant(
+    call_control_id=session.call_control_id,
+    assistant_id=self.settings.telnyx_representative_assistant_id,
+    context=self._assistant_context(session),
+    greeting=self._representative_greeting(session),
+)
+```
+
+The important idea is not the exact phrase detection or the exact prompt. The important idea is that the backend owns the call state and decides when each assistant should be active.
+
+## Try the full cookbook
+
+The complete runnable version is available here:
+
+[Telnyx Outbound Hold Agent Cookbook](https://github.com/anusha-telnyx/telnyx-outbound-hold-agent-cookbook)
+
+The cookbook includes:
+
+- the FastAPI webhook server
+- the call orchestrator
+- the Telnyx Call Control client
+- hold and representative phrase detectors
+- assistant prompts
+- assistant tool endpoints for DTMF, hold detection, and ending calls
+- a demo flow you can use before calling a real company phone tree
+
+Use the cookbook if you want to run the full agent locally, configure Telnyx assistants, expose the webhook server with ngrok, and test the full call flow end to end.
+
 ## What this taught me about real-world voice agents
 
 The planning phase is where the agent starts to work. Before deciding what the assistant should say, you have to ask what you are trying to achieve and why the system should exist in the first place.
